@@ -96,7 +96,7 @@ void push_userstack(char** parsed_filename_argv, int argc,void **esp){
   // 2. word-align
   while(total_size%WORD_SIZE!=0){
     total_size++;
-    *esp--;  
+    (*esp)--;  
   }
   /*if(total_size%WORD_SIZE!=0){
     *esp-=WORD_SIZE-(total_size%WORD_SIZE);
@@ -132,7 +132,6 @@ start_process (void *file_name_)
   char input[INPUT_ARG_MAX+1];
   char* parsed_filename_argv[INPUT_ARG_MAX];
   int argc;
-  printf("filename strlen: %d\n",strlen(file_name));
   strlcpy(input,file_name,strlen(file_name)+1);         // strlen() + '\0'
   argc=parse_file_name(input, parsed_filename_argv);
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
