@@ -46,40 +46,78 @@ process_execute (const char *file_name)
 }
 
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-void parse_file_name(char *input, char *file_name){
-  int i;
-  strlcpy(file_name, input, strlen(input)+1);
-  for(i=0; file_name[i]!=' '&&file_name[i]!='\0';i++);
-  file_name[i]='\0';
-  // char *delim;         /* Points to first space delimiter */
-  //   int argc;            /* Number of args */
-  //   int bg;              /* Background job? */
-
-  //   buf[strlen(buf)-1] = ' ';  /* Replace trailing '\n' with space */
-  //   while (*buf && (*buf == ' ')) /* Ignore leading spaces */
-	// buf++;
-
-  //   /* Build the argv list */
-  //   argc = 0;
-  //   while ((delim = strchr(buf, ' '))) {
-	// argv[argc++] = buf;
-	// *delim = '\0';
-	// buf = delim + 1;
-	// while (*buf && (*buf == ' ')) /* Ignore spaces */
-  //           buf++;
-  //   }
-  //   argv[argc] = NULL;
-    
-  //   if (argc == 0)  /* Ignore blank line */
-	// return 1;
-
-  //   /* Should the job run in the background? */
-  //   if ((bg = (*argv[argc-1] == '&')) != 0)
-	// argv[--argc] = NULL;
-
-  //   return bg;
+int parse_file_name(char *input, char **parsed_filename_argv){
+  char *space;         /* Points to first space delimiter */
+  int argc;            /* Number of args */
+  char* tmp=input;
+  while (*tmp && (*tmp == ' ')) /* Ignore leading spaces */
+	  tmp++;
+  /* Build the argv list */
+  argc = 0;
+  while ((space = strchr(tmp, ' '))) {
+	  parsed_filename_argv[argc++] = tmp;
+	  *space = '\0';
+	  tmp = space + 1;
+	  while (*tmp && (*tmp == ' ')) /* Ignore spaces */
+      tmp++;
+  }
+  parsed_filename_argv[argc++]=tmp;
+  parsed_filename_argv[argc] = NULL;
+  return argc;
 }
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+/*
+  argv[3][...]
+  argv[2][...]
+  argv[1][...]
+  argv[0][...]
+  word-align
+  argv[4]  (null)
+  argv[3]
+  argv[2]
+  argv[1]
+  argv[0]
+  argv
+  argc
+  return address
+  */
+void push_userstack(char** parsed_filename_argv, int argc,void **esp){
+  /* 1. argv[3][...]~[0][...] 
+  == parsed_filename_argv[4][...]~[1][...]
+   file name is counted as argc*/
+  int total_size=0;
+  for(int i=argc-1;i>0;i--){
+    int size=strlen(parsed_filename_argv[i])+1;   // ex) size(bar\0 )= 4
+    *esp-=size;
+    total_size+=size;
+    strlcpy(*esp, parsed_filename_argv[i],size);
+    parsed_filename_argv[i]=*esp;                 // address updated
+  }
+  // 2. word-align
+  while(total_size%WORD_SIZE!=0){
+    total_size++;
+    *esp--;  
+  }
+  /*if(total_size%WORD_SIZE!=0){
+    *esp-=WORD_SIZE-(total_size%WORD_SIZE);
+  }*/
+  /* 3. null + 4. argv[4]~[0]
+  ==parsed_filename_argv[5]~[1]
+  */
+  for(int i=argc;i>0;i--){
+    *esp-=WORD_SIZE;
+    **(uint32_t **)esp=parsed_filename_argv[i];
+  }
+  // argv ,argc, return address
+  *esp-=WORD_SIZE;
+  **(uint32_t **)esp=*esp+WORD_SIZE;
+  *esp-=WORD_SIZE;
+  **(uint32_t **)esp=argc;
+  *esp-=WORD_SIZE;
+  **(uint32_t **)esp=0;
+
+  //hex_dump(*esp,*esp,100,1);
+}
 
 /* A thread function that loads a user process and starts it
    running. */
@@ -91,8 +129,12 @@ start_process (void *file_name_)
   bool success;
 
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  char parsed_file_name[INPUT_ARG_MAX];
-  parse_file_name(file_name, parsed_file_name);
+  char input[INPUT_ARG_MAX+1];
+  char* parsed_filename_argv[INPUT_ARG_MAX];
+  int argc;
+  printf("filename strlen: %d\n",strlen(file_name));
+  strlcpy(input,file_name,strlen(file_name)+1);         // strlen() + '\0'
+  argc=parse_file_name(input, parsed_filename_argv);
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   /* Initialize interrupt frame and load executable. */
@@ -100,14 +142,19 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-
+  printf("argc : %d\n",argc);
+  for(int i=0;i<argc;i++){
+    printf("pargv[%d]: %s\n",i,parsed_filename_argv[i]);
+  }
   //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  success = load (parsed_file_name, &if_.eip, &if_.esp);
+  success = load (parsed_filename_argv[0], &if_.eip, &if_.esp);
   //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
   /* if load success*/
   if(success){
-    //construct_esp(file_name, &if_.esp);
+    push_userstack(parsed_filename_argv, argc, &if_.esp);
+  }
+  for(int i=0;i<argc;i++){
+    printf("pargv[%d]: %s\n",i,parsed_filename_argv[i]);
   }
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -140,6 +187,7 @@ process_wait (tid_t child_tid UNUSED)
   for(int i=0;i<1000000000;i++){
     
   }
+
   //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   return -1;
 }
