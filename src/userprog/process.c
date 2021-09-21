@@ -29,6 +29,7 @@ tid_t
 process_execute (const char *file_name) 
 {
   char *fn_copy;
+  char cmd[INPUT_ARG_MAX];
   tid_t tid;
 
   /* Make a copy of FILE_NAME.
@@ -39,7 +40,16 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+
+  ////////////////!!!!!!
+  /////////////split cmd
+  strlcpy(cmd,file_name,strlen(file_name)+1);
+  for(int i=0;i<strlen(cmd);i++){
+    if(cmd[i]==' ')
+      cmd[i]='\0';
+  }
+  ////////////!!!!!!!
+  tid = thread_create (cmd, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
@@ -83,10 +93,9 @@ int parse_file_name(char *input, char **parsed_filename_argv){
   */
 void push_userstack(char** parsed_filename_argv, int argc,void **esp){
   /* 1. argv[3][...]~[0][...] 
-  == parsed_filename_argv[4][...]~[1][...]
-   file name is counted as argc*/
+   file name is also counted as argc*/
   int total_size=0;
-  for(int i=argc-1;i>0;i--){
+  for(int i=argc-1;i>=0;i--){
     int size=strlen(parsed_filename_argv[i])+1;   // ex) size(bar\0 )= 4
     *esp-=size;
     total_size+=size;
@@ -102,9 +111,8 @@ void push_userstack(char** parsed_filename_argv, int argc,void **esp){
     *esp-=WORD_SIZE-(total_size%WORD_SIZE);
   }*/
   /* 3. null + 4. argv[4]~[0]
-  ==parsed_filename_argv[5]~[1]
   */
-  for(int i=argc;i>0;i--){
+  for(int i=argc;i>=0;i--){
     *esp-=WORD_SIZE;
     **(uint32_t **)esp=parsed_filename_argv[i];
   }
@@ -141,20 +149,15 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  printf("argc : %d\n",argc);
-  for(int i=0;i<argc;i++){
-    printf("pargv[%d]: %s\n",i,parsed_filename_argv[i]);
-  }
-  //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   success = load (parsed_filename_argv[0], &if_.eip, &if_.esp);
-  //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   /* if load success*/
   if(success){
     push_userstack(parsed_filename_argv, argc, &if_.esp);
+    //construct_esp(file_name, &if_.esp);
   }
-  for(int i=0;i<argc;i++){
-    printf("pargv[%d]: %s\n",i,parsed_filename_argv[i]);
-  }
+  // for(int i=0;i<argc;i++){
+  //   printf("pargv[%d]: %s\n",i,parsed_filename_argv[i]);
+  // }
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
@@ -183,9 +186,9 @@ int
 process_wait (tid_t child_tid UNUSED) 
 {
   //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  for(int i=0;i<1000000000;i++){
+   for(int i=0;i<1000000000;i++){
     
-  }
+   }
 
   //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   return -1;
