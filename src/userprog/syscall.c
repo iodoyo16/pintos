@@ -51,7 +51,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   //printf("esp: %x\n",(uint32_t *)(f->esp));
   //printf("syscall num : %d\n",*(uint32_t *)(f->esp));
   //hex_dump(f->esp,f->esp,100,1);
-  switch(*(uint32_t *)(f->esp)){
+  switch(*((uint32_t *)(f->esp))){
     case SYS_HALT:                   /* Halt the operating system. */
       halt();
     break;
