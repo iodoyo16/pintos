@@ -29,7 +29,7 @@ int wait(pid_t pid){
   return process_wait(pid);
 }
 int read(int fd, void* buffer, unsigned size){
-  unsigned i=0;
+  unsigned i;
   if(fd==0){
     for(i=0;i<size;i++){
       if(((char*)buffer)[i]=='\0')
@@ -51,7 +51,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   //printf("esp: %x\n",(uint32_t *)(f->esp));
   //printf("syscall num : %d\n",*(uint32_t *)(f->esp));
   //hex_dump(f->esp,f->esp,100,1);
-  switch(*((uint32_t *)(f->esp))){
+  switch(*(uint32_t *)(f->esp)){
     case SYS_HALT:                   /* Halt the operating system. */
       halt();
     break;
@@ -93,14 +93,14 @@ syscall_handler (struct intr_frame *f UNUSED)
       if(!is_user_vaddr(f->esp+4)||!is_user_vaddr(f->esp+8)||!is_user_vaddr(f->esp+12)){
         exit(-1);
       }
-      f->eax=read(((int)*(uint32_t *)(f->esp + 4)), (void *)(*((uint32_t *)(f->esp +8))), (unsigned)*((uint32_t *)(f->esp+12)));
+      f->eax=read((int)*(uint32_t *)(f->esp + 4), (void *)*(uint32_t *)(f->esp +8), (unsigned)*((uint32_t *)(f->esp+12)));
     break;
     case SYS_WRITE:                  /* Write to a file. */
     // int write (int fd, const void *buffer, unsigned size);
       if(!is_user_vaddr(f->esp+4)||!is_user_vaddr(f->esp+8)||!is_user_vaddr(f->esp+12)){
           exit(-1);
       }
-      f->eax=write(((int)*(uint32_t *)(f->esp + 4)),(void *)(*((uint32_t *)(f->esp + 8))), (unsigned)*((uint32_t *)(f->esp+12)));
+      f->eax=write((int)*(uint32_t *)(f->esp + 4),(void *)*(uint32_t *)(f->esp + 8), (unsigned)*((uint32_t *)(f->esp+12)));
     break;
     case SYS_SEEK:                   /* Change position in a file. */
     // void seek(int fd,unsigned position);

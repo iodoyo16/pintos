@@ -18,6 +18,8 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
+#include "threads/synch.h"
+
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
@@ -48,6 +50,8 @@ process_execute (const char *file_name)
     if(cmd[i]==' ')
       cmd[i]='\0';
   }
+  if(filesys_open(cmd)==NULL)
+    return -1;
   ////////////!!!!!!!
   tid = thread_create (cmd, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
@@ -186,10 +190,20 @@ int
 process_wait (tid_t child_tid UNUSED) 
 {
   //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   for(int i=0;i<1000000000;i++){
-    
-   }
-
+  struct thread* cur_t=thread_current();
+  struct thread* tmp_t;
+  int exit_status;
+  for(struct list_elem* cur_e=list_begin(&(cur_t->t_child)); cur_e!=list_end(&(cur_t->t_child)); cur_e=list_next(cur_e)){
+    tmp_t= list_entry(cur_e,struct thread,t_child_elem);
+    if(child_tid==tmp_t->tid){
+      sema_down(&(tmp_t->wait_lock));
+      exit_status=tmp_t->exit_status;
+      list_remove(&(tmp_t->t_child_elem));
+      sema_up(&(tmp_t->mem_reap_lock));
+      return exit_status;
+    }
+  }
+  //for(int i=0;i<1000000000;i++);
   //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   return -1;
 }
@@ -217,6 +231,8 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+    sema_up(&(cur->wait_lock));
+    sema_down(&(cur->mem_reap_lock));
 }
 
 /* Sets up the CPU for running user code in the current
