@@ -53,7 +53,10 @@ process_execute (const char *file_name)
   if(filesys_open(cmd)==NULL)
     return -1;
   ////////////!!!!!!!
+
+
   tid = thread_create (cmd, PRI_DEFAULT, start_process, fn_copy);
+  sema_down(&(thread_current()->load_lock));
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
@@ -111,9 +114,6 @@ void push_userstack(char** parsed_filename_argv, int argc,void **esp){
     total_size++;
     (*esp)--;  
   }
-  /*if(total_size%WORD_SIZE!=0){
-    *esp-=WORD_SIZE-(total_size%WORD_SIZE);
-  }*/
   /* 3. null + 4. argv[4]~[0]
   */
   for(int i=argc;i>=0;i--){
@@ -127,8 +127,6 @@ void push_userstack(char** parsed_filename_argv, int argc,void **esp){
   **(uint32_t **)esp=argc;
   *esp-=WORD_SIZE;
   **(uint32_t **)esp=0;
-
-  //hex_dump(*esp,*esp,100,1);
 }
 
 /* A thread function that loads a user process and starts it
@@ -157,13 +155,17 @@ start_process (void *file_name_)
   /* if load success*/
   if(success){
     push_userstack(parsed_filename_argv, argc, &if_.esp);
-    //construct_esp(file_name, &if_.esp);
   }
-  // for(int i=0;i<argc;i++){
-  //   printf("pargv[%d]: %s\n",i,parsed_filename_argv[i]);
-  // }
   /* If load failed, quit. */
   palloc_free_page (file_name);
+
+
+  struct thread* parent_thread=thread_current()->parent_thread;
+  if(parent_thread!=NULL){
+    sema_up(&(parent_thread->load_lock));
+  }
+
+
   if (!success) 
     thread_exit ();
 
@@ -195,7 +197,10 @@ process_wait (tid_t child_tid UNUSED)
   int exit_status;
   for(struct list_elem* cur_e=list_begin(&(cur_t->t_child)); cur_e!=list_end(&(cur_t->t_child)); cur_e=list_next(cur_e)){
     tmp_t= list_entry(cur_e,struct thread,t_child_elem);
-    if(child_tid==tmp_t->tid){
+    if(child_tid!=tmp_t->tid){
+      continue;
+    }
+    else{
       sema_down(&(tmp_t->wait_lock));
       exit_status=tmp_t->exit_status;
       list_remove(&(tmp_t->t_child_elem));
@@ -203,7 +208,6 @@ process_wait (tid_t child_tid UNUSED)
       return exit_status;
     }
   }
-  //for(int i=0;i<1000000000;i++);
   //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   return -1;
 }

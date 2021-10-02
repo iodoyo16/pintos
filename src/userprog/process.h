@@ -1,6 +1,6 @@
 #ifndef USERPROG_PROCESS_H
 #define USERPROG_PROCESS_H
-#define INPUT_ARG_MAX 256
+#define INPUT_ARG_MAX 128
 #define WORD_SIZE 4
 
 #include "threads/thread.h"

@@ -98,6 +98,8 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    struct thread* parent_thread;
+    struct semaphore load_lock;
     struct semaphore wait_lock;
     struct semaphore mem_reap_lock;
     struct list t_child;

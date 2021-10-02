@@ -467,12 +467,15 @@ init_thread (struct thread *t, const char *name, int priority)
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
 #ifdef USERPROG
+  old_level = intr_disable ();
+  sema_init(&(t->load_lock),0);
   sema_init(&(t->wait_lock),0);
   sema_init(&(t->mem_reap_lock),0);
+  t->parent_thread=running_thread();
   list_init(&(t->t_child));
-  //old_level = intr_disable ();
+  
   list_push_back(&(running_thread()->t_child), &(t->t_child_elem));
-  //intr_set_level (old_level);
+  intr_set_level (old_level);
 #endif
   
 }
